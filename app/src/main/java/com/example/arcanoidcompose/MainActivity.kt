@@ -1,6 +1,7 @@
 package com.example.arcanoidcompose
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -61,7 +62,7 @@ class MainActivity : ComponentActivity() {
 
         val gameScore = remember { mutableStateOf(0) }
         val gameRunning = remember { mutableStateOf(true) }
-        val gameStage = remember { mutableStateOf(1) }
+        val gameStage = remember { mutableStateOf(2) }
         val newLineInterval = remember { mutableStateOf(50000) }
         val gameTimer = remember { mutableStateOf(0) }
 
@@ -218,30 +219,50 @@ class MainActivity : ComponentActivity() {
                     if (blocksHit.isNotEmpty()) {
                         val hitBlock = blocksHit.first()
 
-                        if (theBall.value.ballSpeedY < 0) {
-                            // Ball is moving upwards and hit the block from below
-                            // Place ball just below the block to prevent it from getting stuck inside
-                            val newY = hitBlock.y + hitBlock.height + theBall.value.ballRadius + 1f
-                            theBall.value = theBall.value.copy(y = newY)
+                        // Update ball Y position to avoid getting stuck inside
+                        val newY = if (theBall.value.ballSpeedY < 0) {
+                            // Ball hit from below
+                            hitBlock.y + hitBlock.height + theBall.value.ballRadius + 1f
                         } else {
-                            // Ball is moving downwards and hit the block from above
-                            // Place ball just above the block
-                            val newY = hitBlock.y - theBall.value.ballRadius * 2 - 1f
-                            theBall.value = theBall.value.copy(y = newY)
+                            // Ball hit from above
+                            hitBlock.y - theBall.value.ballRadius * 2 - 1f
                         }
+                        theBall.value = theBall.value.copy(y = newY)
 
-                        // Reverse vertical speed to bounce the ball
+                        // Reverse vertical speed to bounce
                         theBall.value = theBall.value.copy(ballSpeedY = -theBall.value.ballSpeedY)
 
-                        hitBlock.numOfHits = hitBlock.numOfHits - 1
-                        if (hitBlock.numOfHits == 0)
-                        {
-                            // Remove the hit block
-                            gameState.value.allBlocks = gameState.value.allBlocks.filterNot { it == hitBlock }.toMutableList()
-                            gameScore.value = gameScore.value + 100
-                            ballCollisionOnFrame = true
+                        // Decrease hit count
+                        val newNumHits = hitBlock.numOfHits - 1
+
+                        // Determine new color
+                        val newColor = when (newNumHits) {
+                            3 -> Color.Magenta
+                            2 -> Color.Yellow
+                            1 -> Color.Blue
+                            else -> Color.Blue
                         }
+                        Log.d("BallHit", "Hits left: $newNumHits, Color: $newColor")
+
+                        if (newNumHits <= 0) {
+                            // Remove block
+                            gameState.value.allBlocks =
+                                gameState.value.allBlocks.filterNot { it == hitBlock }.toMutableList()
+                            gameScore.value += 100
+                        } else {
+                            // Replace block with updated one
+                            val updatedBlock = hitBlock.copy(
+                                numOfHits = newNumHits,
+                                blockColor = newColor
+                            )
+                            gameState.value.allBlocks = gameState.value.allBlocks.map {
+                                if (it == hitBlock) updatedBlock else it
+                            }.toMutableList()
+                        }
+
+                        ballCollisionOnFrame = true
                     }
+
 
                     if (allBlocks.isEmpty())
                     {
