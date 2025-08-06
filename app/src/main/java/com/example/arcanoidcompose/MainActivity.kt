@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import com.example.arcanoidcompose.Game.GameState
 import com.example.arcanoidcompose.ui.theme.ArcanoidCOmposeTheme
 import kotlinx.coroutines.delay
+import kotlin.random.Random
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,7 +72,7 @@ class MainActivity : ComponentActivity() {
                 for (i in 0 until numOfBlocksPerLine) {
                     val x = i * (blockWidth)
                     val y = 40
-                    add(GameState.block(x.toFloat(), y.toFloat(), blockWidth.toFloat(), blockWidth.toFloat()))
+                    add(GameState.block(x.toFloat(), y.toFloat(), blockWidth.toFloat(), blockWidth.toFloat(), Color.Blue , 1))
                 }
             }
         }
@@ -90,7 +91,7 @@ class MainActivity : ComponentActivity() {
         val playerRamp = remember { mutableStateListOf<GameState.block>() }
 
         // Initialize ramp blocks
-        LaunchedEffect(Unit) {
+        LaunchedEffect(gameStage.value) {
             if (playerRamp.isEmpty()) {
                 val startX = 320f
                 repeat(5) { i ->
@@ -99,11 +100,20 @@ class MainActivity : ComponentActivity() {
                             x = startX + i * blockWidth,
                             y = 1200f,
                             width = blockWidth.toFloat(),
-                            height = blockWidth.toFloat()
+                            height = blockWidth.toFloat(),
+                            Color.Blue,
+                            1
                         )
                     )
                 }
             }
+            theBall.value = theBall.value.copy(
+                x = 400f,
+                y = 200f,
+                ballRadius = 20f,
+                ballSpeedX = 10f,
+                ballSpeedY = 20f
+            )
         }
 
         // Ramp movement state
@@ -125,7 +135,7 @@ class MainActivity : ComponentActivity() {
 
 //        addExtraLineInArcanoidBlocks(gameState.value , 20 , blockWidth)
 
-        LaunchedEffect(Unit) {
+        LaunchedEffect(gameStage.value) {
             while (true) {
                 withFrameMillis {
                     ballCollisionOnFrame = false
@@ -145,7 +155,8 @@ class MainActivity : ComponentActivity() {
                         addExtraLineInArcanoidBlocks(
                             gameState.value,
                             numOfBlocksPerLine,
-                            blockWidth
+                            blockWidth,
+                            gameStage = gameStage.value
                         )
                     }
 
@@ -222,17 +233,22 @@ class MainActivity : ComponentActivity() {
                         // Reverse vertical speed to bounce the ball
                         theBall.value = theBall.value.copy(ballSpeedY = -theBall.value.ballSpeedY)
 
-                        // Remove the hit block
-                        gameState.value.allBlocks = gameState.value.allBlocks.filterNot { it == hitBlock }.toMutableList()
-                        gameScore.value = gameScore.value + 100
-                        ballCollisionOnFrame = true
+                        hitBlock.numOfHits = hitBlock.numOfHits - 1
+                        if (hitBlock.numOfHits == 0)
+                        {
+                            // Remove the hit block
+                            gameState.value.allBlocks = gameState.value.allBlocks.filterNot { it == hitBlock }.toMutableList()
+                            gameScore.value = gameScore.value + 100
+                            ballCollisionOnFrame = true
+                        }
                     }
 
                     if (allBlocks.isEmpty())
                     {
                         //move to next stage
                         gameStage.value = gameStage.value + 1
-                        newLineInterval.value = newLineInterval.value - 1000
+                        allBlocks.add(GameState.block(0f, 0f ,0f, 0f, Color.Blue, 0))
+                        newLineInterval.value = newLineInterval.value - 5000
                     }
 
                     // Update ball position
@@ -266,8 +282,19 @@ class MainActivity : ComponentActivity() {
             ) {
                 // Draw blocks
                 gameState.value.allBlocks.forEach { block ->
-                    drawRect(Color.Blue, Offset(block.x, block.y), Size(block.width, block.height))
-                }
+// Draw black border (a bit bigger than the block)
+                    drawRect(
+                        color = Color.Black,
+                        topLeft = Offset(block.x, block.y),
+                        size = Size(block.width, block.height)
+                    )
+
+// Draw the block itself
+                    drawRect(
+                        color = block.blockColor,
+                        topLeft = Offset(block.x, block.y),
+                        size = Size(block.width - 2f, block.height - 2f)
+                    )                }
 
                 // Draw ramp
                 gameState.value.playerRamp.forEach { block ->
@@ -392,8 +419,33 @@ class MainActivity : ComponentActivity() {
         return dx * dx + dy * dy < radius * radius
     }
 
+    private fun blockColor(random : Int) : Color
+    {
+        var random = Random.nextInt(random)
+        var color = Color.Blue
+        when (random)
+        {
+            0 ->
+            {
+                color = Color.Blue
+            }
+            1 ->
+            {
+                color = Color.Yellow
+            }
+            2 ->
+            {
+                color = Color.Magenta
+            }
+            3->
+            {
+                color = Color.Red
+            }
+        }
+        return color
+    }
 
-    private fun addExtraLineInArcanoidBlocks(gameState: GameState.GameState , numOfBlocksPerLine : Int, blockSize : Int)
+    private fun addExtraLineInArcanoidBlocks(gameState: GameState.GameState , numOfBlocksPerLine : Int, blockSize : Int, gameStage : Int)
     {
         // Move all blocks down
         for (i in gameState.allBlocks.indices) {
@@ -403,12 +455,35 @@ class MainActivity : ComponentActivity() {
 
         // Add new blocks on top
         for (i in 0 until numOfBlocksPerLine) {
+            var newColor = blockColor(gameStage)
+            var numOfHits = 1
+            when (newColor)
+            {
+                Color.Blue ->
+                {
+                    numOfHits =1
+                }
+                Color.Yellow ->
+                {
+                    numOfHits = 2
+                }
+                Color.Magenta ->
+                {
+                    numOfHits = 3
+                }
+                Color.Red ->
+                {
+                    numOfHits = 4
+                }
+            }
             gameState.allBlocks.add(
                 GameState.block(
                     x = i.toFloat() * (blockSize.toFloat()),
                     y = 0f,
                     width = blockSize.toFloat(),
-                    height = blockSize.toFloat()
+                    height = blockSize.toFloat(),
+                    blockColor = blockColor(gameStage),
+                    numOfHits = numOfHits
                 )
             )
         }
